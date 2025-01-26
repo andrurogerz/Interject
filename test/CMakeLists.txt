@@ -13,14 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-cmake_minimum_required(VERSION 3.30)
-project(Revise LANGUAGES C CXX)
+include(FetchContent)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
-set(CMAKE_CXX_EXTENSIONS)
+FetchContent_Declare(
+  Catch2
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG v3.8.0
+)
+FetchContent_MakeAvailable(Catch2)
+
+add_executable(ReviseTests
+  symbol_tests.cxx
+)
+target_include_directories(ReviseTests PRIVATE ${CMAKE_SOURCE_DIR}/src/lib)
+target_link_libraries(ReviseTests PRIVATE libRevise)
+target_link_libraries(ReviseTests PRIVATE Catch2::Catch2WithMain)
 
 enable_testing()
-
-add_subdirectory(src)
-add_subdirectory(test)
+add_test(NAME ReviseTests COMMAND ReviseTests)

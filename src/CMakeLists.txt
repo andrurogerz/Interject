@@ -13,14 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-cmake_minimum_required(VERSION 3.30)
-project(Revise LANGUAGES C CXX)
+include(FetchContent)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
-set(CMAKE_CXX_EXTENSIONS)
+FetchContent_Declare(
+  elfio
+  GIT_REPOSITORY    https://github.com/serge1/ELFIO.git
+  GIT_TAG           Release_3.12
+  FIND_PACKAGE_ARGS CONFIG
+)
+FetchContent_MakeAvailable(elfio)
 
-enable_testing()
-
-add_subdirectory(src)
-add_subdirectory(test)
+add_library(libRevise STATIC
+  lib/modules.cxx
+  lib/symbols.cxx
+)
+target_include_directories(libRevise PUBLIC include)
+target_include_directories(libRevise PRIVATE ${elfio_SOURCE_DIR})
