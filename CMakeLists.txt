@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 cmake_minimum_required(VERSION 3.30)
-project(Revise LANGUAGES C CXX)
+project(Interject LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
@@ -22,5 +22,5 @@ set(CMAKE_CXX_EXTENSIONS)
 
 enable_testing()
 
-add_subdirectory(src)
-add_subdirectory(test)
+add_subdirectory(Source)
+add_subdirectory(Tests)

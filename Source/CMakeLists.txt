@@ -23,9 +23,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(elfio)
 
-add_library(libRevise STATIC
+add_library(libInterject STATIC
   lib/modules.cxx
   lib/symbols.cxx
 )
-target_include_directories(libRevise PUBLIC include)
-target_include_directories(libRevise PRIVATE ${elfio_SOURCE_DIR})
+target_include_directories(libInterject PUBLIC include)
+target_include_directories(libInterject PRIVATE ${elfio_SOURCE_DIR})

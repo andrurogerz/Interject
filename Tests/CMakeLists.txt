@@ -22,12 +22,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(ReviseTests
+add_executable(InterjectTests
   symbol_tests.cxx
 )
-target_include_directories(ReviseTests PRIVATE ${CMAKE_SOURCE_DIR}/src/lib)
-target_link_libraries(ReviseTests PRIVATE libRevise)
-target_link_libraries(ReviseTests PRIVATE Catch2::Catch2WithMain)
+target_include_directories(InterjectTests PRIVATE ${CMAKE_SOURCE_DIR}/Source/lib)
+target_link_libraries(InterjectTests PRIVATE libInterject)
+target_link_libraries(InterjectTests PRIVATE Catch2::Catch2WithMain)
 
 enable_testing()
-add_test(NAME ReviseTests COMMAND ReviseTests)
+add_test(NAME InterjectTests COMMAND InterjectTests)
