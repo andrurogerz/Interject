@@ -25,7 +25,7 @@ FetchContent_MakeAvailable(Catch2)
 add_executable(InterjectTests
   symbol_tests.cxx
 )
-target_include_directories(InterjectTests PRIVATE ${CMAKE_SOURCE_DIR}/Source/lib)
+target_include_directories(InterjectTests PRIVATE ${CMAKE_SOURCE_DIR}/Source)
 target_link_libraries(InterjectTests PRIVATE libInterject)
 target_link_libraries(InterjectTests PRIVATE Catch2::Catch2WithMain)
 

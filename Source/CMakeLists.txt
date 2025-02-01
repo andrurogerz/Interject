@@ -24,8 +24,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(elfio)
 
 add_library(libInterject STATIC
-  lib/modules.cxx
-  lib/symbols.cxx
+  modules.cxx
+  symbols.cxx
 )
 target_include_directories(libInterject PUBLIC include)
 target_include_directories(libInterject PRIVATE ${elfio_SOURCE_DIR})

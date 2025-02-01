@@ -34,5 +34,4 @@ struct Descriptor {
 };
 
 void lookup(std::span<Descriptor> descriptors);
-
 };
