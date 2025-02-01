@@ -23,10 +23,14 @@
 namespace Symbols {
 
 struct Descriptor {
+  struct Info {
+    std::uintptr_t addr;
+    std::size_t size;
+    void *module_handle;
+    ~Info();
+  };
   std::string_view symbol_name;
-  std::optional<std::string_view> module_name;
-  std::optional<std::uintptr_t> addr;
-  std::optional<void*> module_handle;
+  std::optional<Info> info;
 };
 
 void lookup(std::span<Descriptor> descriptors);

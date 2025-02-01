@@ -23,10 +23,12 @@
 #include "modules.hxx"
 #include "symbols.hxx"
 
+namespace Symbols {
+
 static void
 lookupInSymbolSection(const std::string file_name,
     const ELFIO::const_symbol_section_accessor &symbols,
-    uintptr_t base_addr, std::span<Symbols::Descriptor> descriptors) {
+    uintptr_t base_addr, std::span<Descriptor> descriptors) {
 
   const ELFIO::Elf_Xword symbol_count = symbols.get_symbols_num();
   for (ELFIO::Elf_Xword i = 0; i < symbol_count; i++) {
@@ -47,8 +49,14 @@ lookupInSymbolSection(const std::string file_name,
 
     for (auto &descriptor : descriptors) {
       if (descriptor.symbol_name == name) {
-        descriptor.addr = base_addr + value;
-        descriptor.module_handle = dlopen(file_name.c_str(), RTLD_NOW);
+        descriptor.info = (Descriptor::Info) {
+          .addr = base_addr + value,
+          .size = size,
+          // Add a reference to the loaded module to ensure it does not get unloaded once we've
+          // returned the symbol address to the caller. The reference is released with dlclose in
+          // the Descriptor::Info destructor.
+          .module_handle = ::dlopen(file_name.c_str(), RTLD_NOW),
+        };
         break;
       }
     }
@@ -57,7 +65,7 @@ lookupInSymbolSection(const std::string file_name,
 
 static void
 lookupInELFFile(const std::string &file_name, const ELFIO::elfio &reader,
-    uintptr_t base_addr, std::span<Symbols::Descriptor> descriptors) {
+    uintptr_t base_addr, std::span<Descriptor> descriptors) {
 
   const auto section_count = reader.sections.size();
   for (ELFIO::Elf_Half i = 0; i < section_count; i++) {
@@ -73,7 +81,7 @@ lookupInELFFile(const std::string &file_name, const ELFIO::elfio &reader,
 }
 
 void
-Symbols::lookup(std::span<Symbols::Descriptor> descriptors) {
+lookup(std::span<Descriptor> descriptors) {
 
   Modules::forEach([&](std::string_view obj_name, uintptr_t base_addr) {
     if (obj_name.find("vdso") != std::string_view::npos) {
@@ -90,3 +98,11 @@ Symbols::lookup(std::span<Symbols::Descriptor> descriptors) {
     lookupInELFFile(file_name, reader, base_addr, descriptors);
     });
 }
+
+Descriptor::Info::~Info() {
+  if (this->module_handle) {
+    ::dlclose(this->module_handle);
+  }
+}
+
+};

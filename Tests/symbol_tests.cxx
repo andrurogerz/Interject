@@ -29,10 +29,12 @@ TEST_CASE("Lookup exported symbols", "[symbol]") {
   Symbols::lookup(std::span(descriptors));
 
   for (auto& desc : std::span(descriptors)) {
-    REQUIRE(desc.addr);
-    REQUIRE(desc.module_handle);
-    const uintptr_t sym = (uintptr_t)dlsym(*desc.module_handle, desc.symbol_name.data());
-    CHECK(sym == desc.addr);
+    REQUIRE(desc.info);
+    REQUIRE(desc.info->addr != 0);
+    REQUIRE(desc.info->size > 0);
+    REQUIRE(desc.info->module_handle != nullptr);
+    const uintptr_t sym = (uintptr_t)dlsym(desc.info->module_handle, desc.symbol_name.data());
+    CHECK(sym == desc.info->addr);
   }
 }
 
@@ -62,9 +64,10 @@ TEST_CASE("Lookup private symbols", "[symbol]") {
 
   size_t i = 0;
   for (auto& desc : std::span(descriptors)) {
-    REQUIRE(desc.addr);
-    REQUIRE(desc.module_handle);
-    CHECK(local_functions[i++] == desc.addr);
+    REQUIRE(desc.info);
+    REQUIRE(desc.info->addr != 0);
+    REQUIRE(desc.info->size > 0);
+    CHECK(local_functions[i++] == desc.info->addr);
   }
 }
 
@@ -76,6 +79,5 @@ TEST_CASE("Lookup non-existent symbols", "[symbol]") {
   Symbols::lookup(std::span(descriptors));
 
   auto& desc = descriptors[0];
-  REQUIRE_FALSE(desc.addr);
-  REQUIRE_FALSE(desc.module_handle);
+  REQUIRE_FALSE(desc.info);
 }
