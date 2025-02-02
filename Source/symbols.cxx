@@ -27,8 +27,8 @@ namespace Symbols {
 
 static void
 lookupInSymbolSection(const std::string file_name,
-    const ELFIO::const_symbol_section_accessor &symbols,
-    uintptr_t base_addr, std::span<Descriptor> descriptors) {
+    const ELFIO::const_symbol_section_accessor &symbols, uintptr_t base_addr,
+    std::span<const std::string_view> names, std::span<std::optional<Descriptor>> descriptors) {
 
   const ELFIO::Elf_Xword symbol_count = symbols.get_symbols_num();
   for (ELFIO::Elf_Xword i = 0; i < symbol_count; i++) {
@@ -47,14 +47,14 @@ lookupInSymbolSection(const std::string file_name,
       continue;
     }
 
-    for (auto &descriptor : descriptors) {
-      if (descriptor.symbol_name == name) {
-        descriptor.info = (Descriptor::Info) {
+    for (size_t idx = 0; idx < names.size(); idx++) {
+      if (names[idx] == name) {
+        descriptors[idx] = (Descriptor) {
           .addr = base_addr + value,
           .size = size,
           // Add a reference to the loaded module to ensure it does not get unloaded once we've
           // returned the symbol address to the caller. The reference is released with dlclose in
-          // the Descriptor::Info destructor.
+          // the Descriptor destructor.
           .module_handle = ::dlopen(file_name.c_str(), RTLD_NOW),
         };
         break;
@@ -64,8 +64,8 @@ lookupInSymbolSection(const std::string file_name,
 }
 
 static void
-lookupInELFFile(const std::string &file_name, const ELFIO::elfio &reader,
-    uintptr_t base_addr, std::span<Descriptor> descriptors) {
+lookupInELFFile(const std::string &file_name, const ELFIO::elfio &reader, uintptr_t base_addr,
+    std::span<const std::string_view> names, std::span<std::optional<Descriptor>> descriptors) {
 
   const auto section_count = reader.sections.size();
   for (ELFIO::Elf_Half i = 0; i < section_count; i++) {
@@ -76,12 +76,12 @@ lookupInELFFile(const std::string &file_name, const ELFIO::elfio &reader,
     }
 
     const ELFIO::const_symbol_section_accessor symbols(reader, section);
-    lookupInSymbolSection(file_name, symbols, base_addr, descriptors);
+    lookupInSymbolSection(file_name, symbols, base_addr, names, descriptors);
   }
 }
 
 void
-lookup(std::span<Descriptor> descriptors) {
+lookup(std::span<const std::string_view> names, std::span<std::optional<Descriptor>> descriptors) {
 
   Modules::forEach([&](std::string_view obj_name, uintptr_t base_addr) {
     if (obj_name.find("vdso") != std::string_view::npos) {
@@ -95,11 +95,11 @@ lookup(std::span<Descriptor> descriptors) {
       return;
     }
 
-    lookupInELFFile(file_name, reader, base_addr, descriptors);
+    lookupInELFFile(file_name, reader, base_addr, names, descriptors);
     });
 }
 
-Descriptor::Info::~Info() {
+Descriptor::~Descriptor() {
   if (this->module_handle) {
     ::dlclose(this->module_handle);
   }

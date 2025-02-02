@@ -21,20 +21,22 @@
 #include <symbols.hxx>
 
 TEST_CASE("Lookup exported symbols", "[symbol]") {
-  Symbols::Descriptor descriptors[] =  {
-      { "malloc" },
-      { "snprintf" },
+  constexpr std::string_view names[] = {
+    "malloc",
+    "snprintf",
   };
+  std::optional<Symbols::Descriptor> descriptors[std::span(names).size()];
 
-  Symbols::lookup(std::span(descriptors));
+  Symbols::lookup(std::span(names), std::span(descriptors));
 
-  for (auto& desc : std::span(descriptors)) {
-    REQUIRE(desc.info);
-    REQUIRE(desc.info->addr != 0);
-    REQUIRE(desc.info->size > 0);
-    REQUIRE(desc.info->module_handle != nullptr);
-    const uintptr_t sym = (uintptr_t)dlsym(desc.info->module_handle, desc.symbol_name.data());
-    CHECK(sym == desc.info->addr);
+  for (size_t idx = 0; idx < std::span(names).size(); idx++) {
+    auto& name = names[idx];
+    auto& desc = descriptors[idx];
+    REQUIRE(desc);
+    CHECK(desc->size > 0);
+    CHECK(desc->module_handle != nullptr);
+    const uintptr_t sym = (uintptr_t)dlsym(desc->module_handle, name.data());
+    CHECK(sym == desc->addr);
   }
 }
 
@@ -46,12 +48,13 @@ extern "C" {
 }
 
 TEST_CASE("Lookup private symbols", "[symbol]") {
-  Symbols::Descriptor descriptors[] =  {
-      { "test_function_1" },
-      { "test_function_2" },
-      { "test_array_1" },
-      { "test_array_2" },
+  constexpr std::string_view names[] = {
+    "test_function_1",
+    "test_function_2",
+    "test_array_1",
+    "test_array_2",
   };
+  std::optional<Symbols::Descriptor> descriptors[std::span(names).size()];
 
   uintptr_t local_functions[] = {
     reinterpret_cast<uintptr_t>(test_function_1),
@@ -60,24 +63,25 @@ TEST_CASE("Lookup private symbols", "[symbol]") {
     reinterpret_cast<uintptr_t>(test_array_2),
   };
 
-  Symbols::lookup(std::span(descriptors));
+  Symbols::lookup(std::span(names), std::span(descriptors));
 
-  size_t i = 0;
-  for (auto& desc : std::span(descriptors)) {
-    REQUIRE(desc.info);
-    REQUIRE(desc.info->addr != 0);
-    REQUIRE(desc.info->size > 0);
-    CHECK(local_functions[i++] == desc.info->addr);
+  for (size_t idx = 0; idx < std::span(names).size(); idx++) {
+    auto& name = names[idx];
+    auto& desc = descriptors[idx];
+    REQUIRE(desc);
+    CHECK(desc->size > 0);
+    CHECK(local_functions[idx] == desc->addr);
   }
 }
 
 TEST_CASE("Lookup non-existent symbols", "[symbol]") {
-  Symbols::Descriptor descriptors[] =  {
-      { "kwyjibo" },
+  constexpr std::string_view names[] {
+    "kwyjibo",
   };
+  std::optional<Symbols::Descriptor> descriptors[std::span(names).size()];
 
-  Symbols::lookup(std::span(descriptors));
+  Symbols::lookup(std::span(names), std::span(descriptors));
 
   auto& desc = descriptors[0];
-  REQUIRE_FALSE(desc.info);
+  REQUIRE_FALSE(desc);
 }
