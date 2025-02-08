@@ -39,6 +39,7 @@ Transaction::ResultCode Transaction::prepare() {
   }
 
   _state = TxnPrepared;
+  _descriptors = std::move(descriptors);
   return Success;
 }
 
