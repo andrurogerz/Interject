@@ -24,6 +24,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(elfio)
 
 add_library(libInterject STATIC
+  memory_map.cxx
   modules.cxx
   symbols.cxx
   transaction.cxx
