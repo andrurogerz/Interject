@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include <cstdint>
+#include <string_view>
+#include <utility>
 #include <vector>
 
-#include <string>
-#include <iostream>
+#include "symbols.hxx"
 
 namespace Interject {
 
@@ -71,6 +73,7 @@ private:
   State _state;
   std::vector<std::string_view> _names;
   std::vector<std::uintptr_t> _hook_addrs;
+  std::vector<Symbols::Descriptor> _descriptors;
 };
 
 };

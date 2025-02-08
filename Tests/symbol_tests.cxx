@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_test_macros.hpp>
 
@@ -27,18 +28,17 @@ TEST_CASE("Lookup exported symbols", "[symbol]") {
     "malloc",
     "snprintf",
   };
-  std::optional<Symbols::Descriptor> descriptors[std::span(names).size()];
+  Symbols::Descriptor descriptors[std::span(names).size()];
 
   Symbols::lookup(std::span(names), std::span(descriptors));
 
   for (size_t idx = 0; idx < std::span(names).size(); idx++) {
     auto& name = names[idx];
     auto& desc = descriptors[idx];
-    REQUIRE(desc);
-    CHECK(desc->size > 0);
-    CHECK(desc->module_handle != nullptr);
-    const uintptr_t sym = (uintptr_t)dlsym(desc->module_handle, name.data());
-    CHECK(sym == desc->addr);
+    CHECK(desc.size > 0);
+    CHECK(desc.module_handle != nullptr);
+    const uintptr_t sym = (uintptr_t)dlsym(desc.module_handle, name.data());
+    CHECK(sym == desc.addr);
   }
 }
 
@@ -56,7 +56,7 @@ TEST_CASE("Lookup private symbols", "[symbol]") {
     "test_array_1",
     "test_array_2",
   };
-  std::optional<Symbols::Descriptor> descriptors[std::span(names).size()];
+  Symbols::Descriptor descriptors[std::span(names).size()];
 
   uintptr_t local_functions[] = {
     reinterpret_cast<uintptr_t>(test_function_1),
@@ -70,9 +70,8 @@ TEST_CASE("Lookup private symbols", "[symbol]") {
   for (size_t idx = 0; idx < std::span(names).size(); idx++) {
     auto& name = names[idx];
     auto& desc = descriptors[idx];
-    REQUIRE(desc);
-    CHECK(desc->size > 0);
-    CHECK(local_functions[idx] == desc->addr);
+    CHECK(desc.size > 0);
+    CHECK(local_functions[idx] == desc.addr);
   }
 }
 
@@ -80,10 +79,11 @@ TEST_CASE("Lookup non-existent symbols", "[symbol]") {
   constexpr std::string_view names[] {
     "kwyjibo",
   };
-  std::optional<Symbols::Descriptor> descriptors[std::span(names).size()];
+  Symbols::Descriptor descriptors[std::span(names).size()];
 
   Symbols::lookup(std::span(names), std::span(descriptors));
 
   auto& desc = descriptors[0];
-  REQUIRE_FALSE(desc);
+  CHECK(desc.size == 0);
+  CHECK(desc.addr == 0);
 }

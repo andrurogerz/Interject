@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include <dlfcn.h>
 
 #include <format>
@@ -28,7 +29,7 @@ namespace Interject::Symbols {
 static void
 lookupInSymbolSection(const std::string file_name,
     const ELFIO::const_symbol_section_accessor &symbols, uintptr_t base_addr,
-    std::span<const std::string_view> names, std::span<std::optional<Descriptor>> descriptors) {
+    std::span<const std::string_view> names, std::span<Symbols::Descriptor> descriptors) {
 
   const ELFIO::Elf_Xword symbol_count = symbols.get_symbols_num();
   for (ELFIO::Elf_Xword i = 0; i < symbol_count; i++) {
@@ -49,14 +50,13 @@ lookupInSymbolSection(const std::string file_name,
 
     for (size_t idx = 0; idx < names.size(); idx++) {
       if (names[idx] == name) {
-        descriptors[idx] = (Descriptor) {
-          .addr = base_addr + value,
-          .size = size,
-          // Add a reference to the loaded module to ensure it does not get unloaded once we've
-          // returned the symbol address to the caller. The reference is released with dlclose in
-          // the Descriptor destructor.
-          .module_handle = ::dlopen(file_name.c_str(), RTLD_NOW),
-        };
+        auto &descriptor = descriptors[idx];
+        descriptor.addr = base_addr + value;
+        descriptor.size = size;
+        // Add a reference to the loaded module to ensure it does not get unloaded once we've
+        // returned the symbol address to the caller. The reference is released with dlclose in
+        // the Descriptor destructor.
+        descriptor.module_handle = ::dlopen(file_name.c_str(), RTLD_NOW);
         break;
       }
     }
@@ -65,7 +65,7 @@ lookupInSymbolSection(const std::string file_name,
 
 static void
 lookupInELFFile(const std::string &file_name, const ELFIO::elfio &reader, uintptr_t base_addr,
-    std::span<const std::string_view> names, std::span<std::optional<Descriptor>> descriptors) {
+    std::span<const std::string_view> names, std::span<Symbols::Descriptor> descriptors) {
 
   const auto section_count = reader.sections.size();
   for (ELFIO::Elf_Half i = 0; i < section_count; i++) {
@@ -81,7 +81,7 @@ lookupInELFFile(const std::string &file_name, const ELFIO::elfio &reader, uintpt
 }
 
 void
-lookup(std::span<const std::string_view> names, std::span<std::optional<Descriptor>> descriptors) {
+lookup(std::span<const std::string_view> names, std::span<Descriptor> descriptors) {
 
   Modules::forEach([&](std::string_view obj_name, uintptr_t base_addr) {
     if (obj_name.find("vdso") != std::string_view::npos) {

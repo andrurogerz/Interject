@@ -27,11 +27,11 @@ Transaction::ResultCode Transaction::prepare() {
     return ErrorInvalidState;
   }
 
-  std::vector<std::optional<Symbols::Descriptor>> descriptors(_names.size());
+  std::vector<Symbols::Descriptor> descriptors(_names.size());
   Symbols::lookup(_names, descriptors);
 
   for (size_t idx = 0; idx < _names.size(); idx++) {
-    if (!descriptors[idx]) {
+    if (descriptors[idx].addr == 0) {
       return ErrorSymbolNotFound;
     }
 

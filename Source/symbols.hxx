@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #pragma once
 
 #include <cstdint>
-#include <optional>
 #include <span>
 #include <string_view>
 
@@ -26,10 +26,12 @@ struct Descriptor {
   std::uintptr_t addr;
   std::size_t size;
   void *module_handle;
+  Descriptor() : addr(0), size(0), module_handle(nullptr) {}
   ~Descriptor();
 };
 
 void lookup(
   std::span<const std::string_view> names,
-  std::span<std::optional<Descriptor>> descriptors);
+  std::span<Descriptor> descriptors);
+
 };
