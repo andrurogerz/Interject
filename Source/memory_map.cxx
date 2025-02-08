@@ -41,6 +41,10 @@ bool MemoryMap::load(const std::string_view &file_name) {
     const std::string_view addrRange = lineView.substr(0, addrEnd);
     const std::string_view permissions = lineView.substr(addrEnd + 1, 4);
 
+    const int perms = (permissions[0] == 'r' ? PROT_READ : 0)
+      | (permissions[1] == 'w' ? PROT_WRITE : 0)
+      | (permissions[2] == 'x' ? PROT_EXEC : 0);
+
     const auto dashPos = addrRange.find('-');
     const std::string_view startAddr = addrRange.substr(0, dashPos);
     const std::string_view endAddr = addrRange.substr(dashPos + 1);
@@ -51,25 +55,16 @@ bool MemoryMap::load(const std::string_view &file_name) {
     };
 
     std::uintptr_t start, end;
-    if (!parseAddr(startAddr, start) || !parseAddr(endAddr, end)) {
+    if (!parseAddr(startAddr, start) ||
+        !parseAddr(endAddr, end)) {
       std::cerr << std::format("failed to parse address range {}", addrRange) << std::endl;
       return false;
     }
 
-    _regions.emplace_back((Region){
-      .start = start,
-      .end = end,
-      .permissions = (permissions[0] == 'r' ? PROT_READ : 0)
-          | (permissions[1] == 'w' ? PROT_WRITE : 0)
-          | (permissions[2] == 'x' ? PROT_EXEC : 0),
-    });
+    _regions.emplace_back((Region){ start, end, perms });
   }
 
   return true;
-}
-
-const std::vector<MemoryMap::Region>& MemoryMap::regions() const {
-  return _regions;
 }
 
 };

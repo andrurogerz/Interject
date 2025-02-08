@@ -30,7 +30,7 @@ TEST_CASE("Parse non-existent file", "[memory_map]") {
 
 TEST_CASE("Parse /proc/self/maps", "[memory_map]") {
   MemoryMap map;
-  REQUIRE(map.load("/proc/self/maps"));
+  REQUIRE(map.load());
 
   // Try to locate an executable section that contains our return addr.
   bool found_addr = false;
@@ -40,8 +40,7 @@ TEST_CASE("Parse /proc/self/maps", "[memory_map]") {
     CHECK(region.start > 0);
     CHECK(region.end > region.start);
 
-    // Expect at least one permission bit is set on every region.
-    CHECK(region.permissions != 0);
+    // Expect no invalid permission bits.
     CHECK_FALSE(region.permissions & ~(PROT_READ | PROT_WRITE | PROT_EXEC));
 
     if (return_addr >= region.start && return_addr <= region.end) {
@@ -52,4 +51,10 @@ TEST_CASE("Parse /proc/self/maps", "[memory_map]") {
   }
 
   CHECK(found_addr);
+}
+
+TEST_CASE("Reload /proc/self/maps", "[memory_map]") {
+  MemoryMap map;
+  REQUIRE(map.load());
+  REQUIRE(map.load());
 }

@@ -16,8 +16,10 @@
 
 #pragma once
 
+#include <charconv>
 #include <cstdint>
 #include <vector>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -31,10 +33,17 @@ public:
     int permissions;
   };
 
-  // load or re-load
+  // load or re-load memory mapping for the current process
+  bool load() {
+    return load("/proc/self/maps");
+  }
+
+  // load or re-load the specified memory mapping
   bool load(const std::string_view &file_name);
 
-  const std::vector<Region>& regions() const;
+  std::span<const Region> regions() const {
+    return { _regions.data(), _regions.size() };
+  }
 
 private:
   std::vector<Region> _regions;
