@@ -23,7 +23,7 @@
 #include "modules.hxx"
 #include "symbols.hxx"
 
-namespace Symbols {
+namespace Interject::Symbols {
 
 static void
 lookupInSymbolSection(const std::string file_name,

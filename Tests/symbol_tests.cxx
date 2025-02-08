@@ -20,6 +20,8 @@
 
 #include <symbols.hxx>
 
+using namespace Interject;
+
 TEST_CASE("Lookup exported symbols", "[symbol]") {
   constexpr std::string_view names[] = {
     "malloc",

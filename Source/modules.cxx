@@ -22,7 +22,9 @@
 
 #include "modules.hxx"
 
-std::string Modules::getExecutablePath() {
+namespace Interject::Modules {
+
+std::string getExecutablePath() {
   constexpr auto SELF_EXE = "/proc/self/exe";
   std::vector<char> buffer(PATH_MAX);
   ssize_t len = ::readlink(SELF_EXE, buffer.data(), buffer.size() - 1);
@@ -45,11 +47,11 @@ static int dl_iterate_phdr_callback(struct dl_phdr_info* info, size_t size, void
     return 0;
   }
 
-  auto& func = *static_cast<Modules::Callback*>(context);
+  auto& func = *static_cast<Callback*>(context);
   if (info->dlpi_name == nullptr || info->dlpi_name[0] == '\0') {
     // The name of the entry is not populated, indicating this is the main
     // executable.
-    func(Modules::getExecutablePath(), static_cast<uintptr_t>(info->dlpi_addr));
+    func(getExecutablePath(), static_cast<uintptr_t>(info->dlpi_addr));
   } else {
     func(static_cast<std::string_view>(info->dlpi_name), static_cast<uintptr_t>(info->dlpi_addr));
   }
@@ -57,6 +59,8 @@ static int dl_iterate_phdr_callback(struct dl_phdr_info* info, size_t size, void
   return 0;
 }
 
-void Modules::forEach(Modules::Callback callback) {
+void forEach(Callback callback) {
   dl_iterate_phdr(dl_iterate_phdr_callback, &callback);
 }
+
+};

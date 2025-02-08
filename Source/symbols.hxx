@@ -20,7 +20,7 @@
 #include <span>
 #include <string_view>
 
-namespace Symbols {
+namespace Interject::Symbols {
 
 struct Descriptor {
   std::uintptr_t addr;

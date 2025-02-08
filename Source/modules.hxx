@@ -19,7 +19,7 @@
 #include <functional>
 #include <string_view>
 
-namespace Modules {
+namespace Interject::Modules {
   //using Callback = void(*)(std::string_view obj_name, std::uintptr_t base_addr);
   using Callback = std::function<void(std::string_view obj_name, std::uintptr_t base_addr)>;
 
