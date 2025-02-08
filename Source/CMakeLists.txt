@@ -26,6 +26,7 @@ FetchContent_MakeAvailable(elfio)
 add_library(libInterject STATIC
   modules.cxx
   symbols.cxx
+  transaction.cxx
 )
 target_include_directories(libInterject PUBLIC include)
 target_include_directories(libInterject PRIVATE ${elfio_SOURCE_DIR})
