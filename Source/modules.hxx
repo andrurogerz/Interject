@@ -20,13 +20,15 @@
 #include <string_view>
 
 namespace Interject::Modules {
-  //using Callback = void(*)(std::string_view obj_name, std::uintptr_t base_addr);
-  using Callback = std::function<void(std::string_view obj_name, std::uintptr_t base_addr)>;
+// using Callback = void(*)(std::string_view obj_name, std::uintptr_t
+// base_addr);
+using Callback =
+    std::function<void(std::string_view obj_name, std::uintptr_t base_addr)>;
 
-  // Iterate the current process linkmap and invoke a callback for each loaded
-  // module.
-  void forEach(Callback);
+// Iterate the current process linkmap and invoke a callback for each loaded
+// module.
+void forEach(Callback);
 
-  // Return the executable file path for the current process.
-  std::string getExecutablePath();
-};
+// Return the executable file path for the current process.
+std::string getExecutablePath();
+}; // namespace Interject::Modules

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include "symbols.hxx"
 #include "transaction.hxx"
+#include "symbols.hxx"
 
 #include <format>
 #include <iostream>
@@ -35,7 +35,8 @@ Transaction::ResultCode Transaction::prepare() {
       return ErrorSymbolNotFound;
     }
 
-    // TODO: allocate trampoline and copy function preamble to trampoline location
+    // TODO: allocate trampoline and copy function preamble to trampoline
+    // location
   }
 
   _state = TxnPrepared;
@@ -60,4 +61,4 @@ Transaction::ResultCode Transaction::abort() {
   return Success;
 }
 
-};
+}; // namespace Interject

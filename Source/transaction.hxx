@@ -35,7 +35,7 @@ public:
   class Builder {
   public:
     template <typename TFn>
-    Builder& add(const std::string_view &name, TFn hook) {
+    Builder &add(const std::string_view &name, TFn hook) {
       names.emplace_back(name);
       hook_addrs.emplace_back(reinterpret_cast<std::uintptr_t>(hook));
       return *this;
@@ -64,11 +64,10 @@ private:
     TxnCommitted,
   };
 
-  Transaction(const std::vector<std::string_view>&& names,
+  Transaction(const std::vector<std::string_view> &&names,
               const std::vector<std::uintptr_t> hook_addrs)
-    : _state(TxnInitialized),
-      _names(std::move(names)),
-      _hook_addrs(std::move(hook_addrs)) {}
+      : _state(TxnInitialized), _names(std::move(names)),
+        _hook_addrs(std::move(hook_addrs)) {}
 
   State _state;
   std::vector<std::string_view> _names;
@@ -76,4 +75,4 @@ private:
   std::vector<Symbols::Descriptor> _descriptors;
 };
 
-};
+}; // namespace Interject

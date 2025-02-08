@@ -28,8 +28,10 @@ namespace Interject::Symbols {
 
 static void
 lookupInSymbolSection(const std::string file_name,
-    const ELFIO::const_symbol_section_accessor &symbols, uintptr_t base_addr,
-    std::span<const std::string_view> names, std::span<Symbols::Descriptor> descriptors) {
+                      const ELFIO::const_symbol_section_accessor &symbols,
+                      uintptr_t base_addr,
+                      std::span<const std::string_view> names,
+                      std::span<Symbols::Descriptor> descriptors) {
 
   const ELFIO::Elf_Xword symbol_count = symbols.get_symbols_num();
   for (ELFIO::Elf_Xword i = 0; i < symbol_count; i++) {
@@ -38,7 +40,8 @@ lookupInSymbolSection(const std::string file_name,
     ELFIO::Elf_Xword size;
     ELFIO::Elf_Half section_index;
     unsigned char bind, type, other;
-    if (!symbols.get_symbol(i, name, value, size, bind, type, section_index, other)) {
+    if (!symbols.get_symbol(i, name, value, size, bind, type, section_index,
+                            other)) {
       std::cerr << "failed loading symbol" << std::endl;
       continue;
     }
@@ -53,9 +56,9 @@ lookupInSymbolSection(const std::string file_name,
         auto &descriptor = descriptors[idx];
         descriptor.addr = base_addr + value;
         descriptor.size = size;
-        // Add a reference to the loaded module to ensure it does not get unloaded once we've
-        // returned the symbol address to the caller. The reference is released with dlclose in
-        // the Descriptor destructor.
+        // Add a reference to the loaded module to ensure it does not get
+        // unloaded once we've returned the symbol address to the caller. The
+        // reference is released with dlclose in the Descriptor destructor.
         descriptor.module_handle = ::dlopen(file_name.c_str(), RTLD_NOW);
         break;
       }
@@ -63,9 +66,10 @@ lookupInSymbolSection(const std::string file_name,
   }
 }
 
-static void
-lookupInELFFile(const std::string &file_name, const ELFIO::elfio &reader, uintptr_t base_addr,
-    std::span<const std::string_view> names, std::span<Symbols::Descriptor> descriptors) {
+static void lookupInELFFile(const std::string &file_name,
+                            const ELFIO::elfio &reader, uintptr_t base_addr,
+                            std::span<const std::string_view> names,
+                            std::span<Symbols::Descriptor> descriptors) {
 
   const auto section_count = reader.sections.size();
   for (ELFIO::Elf_Half i = 0; i < section_count; i++) {
@@ -80,8 +84,8 @@ lookupInELFFile(const std::string &file_name, const ELFIO::elfio &reader, uintpt
   }
 }
 
-void
-lookup(std::span<const std::string_view> names, std::span<Descriptor> descriptors) {
+void lookup(std::span<const std::string_view> names,
+            std::span<Descriptor> descriptors) {
 
   Modules::forEach([&](std::string_view obj_name, uintptr_t base_addr) {
     if (obj_name.find("vdso") != std::string_view::npos) {
@@ -91,12 +95,13 @@ lookup(std::span<const std::string_view> names, std::span<Descriptor> descriptor
     std::string file_name(obj_name);
     ELFIO::elfio reader;
     if (!reader.load(file_name)) {
-      std::cerr << std::format("failed to load {} as an ELF file", file_name) << std::endl;
+      std::cerr << std::format("failed to load {} as an ELF file", file_name)
+                << std::endl;
       return;
     }
 
     lookupInELFFile(file_name, reader, base_addr, names, descriptors);
-    });
+  });
 }
 
 Descriptor::~Descriptor() {
@@ -105,4 +110,4 @@ Descriptor::~Descriptor() {
   }
 }
 
-};
+}; // namespace Interject::Symbols

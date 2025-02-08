@@ -30,8 +30,7 @@ struct Descriptor {
   ~Descriptor();
 };
 
-void lookup(
-  std::span<const std::string_view> names,
-  std::span<Descriptor> descriptors);
+void lookup(std::span<const std::string_view> names,
+            std::span<Descriptor> descriptors);
 
-};
+}; // namespace Interject::Symbols

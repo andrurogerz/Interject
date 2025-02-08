@@ -30,9 +30,8 @@ extern "C" ssize_t test_fn_sub(size_t arg1, ssize_t arg2) {
 }
 
 TEST_CASE("Create and abort transaction", "[transaction]") {
-  Interject::Transaction txn = Transaction::Builder()
-    .add("test_fn_add", test_fn_sub)
-    .build();
+  Interject::Transaction txn =
+      Transaction::Builder().add("test_fn_add", test_fn_sub).build();
   CHECK(txn.prepare() == Transaction::ResultCode::Success);
   CHECK(txn.abort() == Transaction::ResultCode::Success);
 }

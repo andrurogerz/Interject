@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include <fstream>
 #include <format>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 
@@ -41,30 +41,32 @@ bool MemoryMap::load(const std::string_view &file_name) {
     const std::string_view addrRange = lineView.substr(0, addrEnd);
     const std::string_view permissions = lineView.substr(addrEnd + 1, 4);
 
-    const int perms = (permissions[0] == 'r' ? PROT_READ : 0)
-      | (permissions[1] == 'w' ? PROT_WRITE : 0)
-      | (permissions[2] == 'x' ? PROT_EXEC : 0);
+    const int perms = (permissions[0] == 'r' ? PROT_READ : 0) |
+                      (permissions[1] == 'w' ? PROT_WRITE : 0) |
+                      (permissions[2] == 'x' ? PROT_EXEC : 0);
 
     const auto dashPos = addrRange.find('-');
     const std::string_view startAddr = addrRange.substr(0, dashPos);
     const std::string_view endAddr = addrRange.substr(dashPos + 1);
 
-    const auto parseAddr = [](std::string_view str, std::uintptr_t &addr) -> bool {
-      auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), addr, 16);
+    const auto parseAddr = [](std::string_view str,
+                              std::uintptr_t &addr) -> bool {
+      auto [ptr, ec] =
+          std::from_chars(str.data(), str.data() + str.size(), addr, 16);
       return (ec == std::errc()) ? true : false;
     };
 
     std::uintptr_t start, end;
-    if (!parseAddr(startAddr, start) ||
-        !parseAddr(endAddr, end)) {
-      std::cerr << std::format("failed to parse address range {}", addrRange) << std::endl;
+    if (!parseAddr(startAddr, start) || !parseAddr(endAddr, end)) {
+      std::cerr << std::format("failed to parse address range {}", addrRange)
+                << std::endl;
       return false;
     }
 
-    _regions.emplace_back((Region){ start, end, perms });
+    _regions.emplace_back((Region){start, end, perms});
   }
 
   return true;
 }
 
-};
+}; // namespace Interject

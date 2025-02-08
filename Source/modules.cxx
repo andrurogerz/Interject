@@ -41,19 +41,21 @@ std::string getExecutablePath() {
   return std::string(buffer.data());
 }
 
-static int dl_iterate_phdr_callback(struct dl_phdr_info* info, size_t size, void *context) {
-  if (info->dlpi_phnum == 0 || info->dlpi_phdr == nullptr)  {
+static int dl_iterate_phdr_callback(struct dl_phdr_info *info, size_t size,
+                                    void *context) {
+  if (info->dlpi_phnum == 0 || info->dlpi_phdr == nullptr) {
     // Entry has no ELF headers so skip it.
     return 0;
   }
 
-  auto& func = *static_cast<Callback*>(context);
+  auto &func = *static_cast<Callback *>(context);
   if (info->dlpi_name == nullptr || info->dlpi_name[0] == '\0') {
     // The name of the entry is not populated, indicating this is the main
     // executable.
     func(getExecutablePath(), static_cast<uintptr_t>(info->dlpi_addr));
   } else {
-    func(static_cast<std::string_view>(info->dlpi_name), static_cast<uintptr_t>(info->dlpi_addr));
+    func(static_cast<std::string_view>(info->dlpi_name),
+         static_cast<uintptr_t>(info->dlpi_addr));
   }
 
   return 0;
@@ -63,4 +65,4 @@ void forEach(Callback callback) {
   dl_iterate_phdr(dl_iterate_phdr_callback, &callback);
 }
 
-};
+}; // namespace Interject::Modules

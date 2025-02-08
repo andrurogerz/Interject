@@ -18,10 +18,10 @@
 
 #include <charconv>
 #include <cstdint>
-#include <vector>
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace Interject {
 
@@ -34,19 +34,17 @@ public:
   };
 
   // load or re-load memory mapping for the current process
-  bool load() {
-    return load("/proc/self/maps");
-  }
+  bool load() { return load("/proc/self/maps"); }
 
   // load or re-load the specified memory mapping
   bool load(const std::string_view &file_name);
 
   std::span<const Region> regions() const {
-    return { _regions.data(), _regions.size() };
+    return {_regions.data(), _regions.size()};
   }
 
 private:
   std::vector<Region> _regions;
 };
 
-};
+}; // namespace Interject

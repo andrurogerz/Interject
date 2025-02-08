@@ -34,7 +34,8 @@ TEST_CASE("Parse /proc/self/maps", "[memory_map]") {
 
   // Try to locate an executable section that contains our return addr.
   bool found_addr = false;
-  const std::uintptr_t return_addr = reinterpret_cast<std::uintptr_t>(__builtin_return_address(0));
+  const std::uintptr_t return_addr =
+      reinterpret_cast<std::uintptr_t>(__builtin_return_address(0));
 
   for (auto &region : map.regions()) {
     CHECK(region.start > 0);
