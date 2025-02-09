@@ -33,5 +33,5 @@ TEST_CASE("Create and abort transaction", "[transaction]") {
   Interject::Transaction txn =
       Transaction::Builder().add("test_fn_add", test_fn_sub).build();
   CHECK(txn.prepare() == Transaction::ResultCode::Success);
-  CHECK(txn.abort() == Transaction::ResultCode::Success);
+  CHECK(txn.commit() == Transaction::ResultCode::Success);
 }

@@ -15,12 +15,19 @@
  */
 
 #include "transaction.hxx"
+#include "memory_map.hxx"
 #include "symbols.hxx"
 
 #include <format>
 #include <iostream>
 
+#include <sys/mman.h>
+#include <unistd.h>
+
 namespace Interject {
+
+std::size_t Transaction::_pageSize =
+    static_cast<std::size_t>(sysconf(_SC_PAGESIZE));
 
 Transaction::ResultCode Transaction::prepare() {
   if (_state != TxnInitialized) {
@@ -30,10 +37,30 @@ Transaction::ResultCode Transaction::prepare() {
   std::vector<Symbols::Descriptor> descriptors(_names.size());
   Symbols::lookup(_names, descriptors);
 
+  MemoryMap map;
+  if (!map.load()) {
+    return ErrorUnexpected;
+  }
+
+  std::unordered_map<uintptr_t, int> pagePermissions;
   for (size_t idx = 0; idx < _names.size(); idx++) {
-    if (descriptors[idx].addr == 0) {
+    const auto addr = descriptors[idx].addr;
+    if (addr == 0) {
       return ErrorSymbolNotFound;
     }
+
+    const auto page_addr = addr & ~(_pageSize - 1);
+    if (pagePermissions.find(page_addr) != pagePermissions.end()) {
+      // This page is already present.
+      continue;
+    }
+
+    const auto region = map.find(page_addr);
+    if (!region) {
+      return ErrorSymbolNotFound;
+    }
+
+    pagePermissions[page_addr] = region->permissions;
 
     // TODO: allocate trampoline and copy function preamble to trampoline
     // location
@@ -41,17 +68,39 @@ Transaction::ResultCode Transaction::prepare() {
 
   _state = TxnPrepared;
   _descriptors = std::move(descriptors);
+  _pagePermissions = std::move(pagePermissions);
   return Success;
 }
 
 Transaction::ResultCode Transaction::commit() {
-  // TODO: prepare function memory for write
+  // Prepare the first page of every hooked function to be writable.
+  ResultCode result = Success;
+
+  for (const auto &pair : _pagePermissions) {
+    const int prot = pair.second | PROT_EXEC;
+    if (::mprotect(reinterpret_cast<void *>(pair.first), _pageSize, prot) !=
+        0) {
+      std::cerr << "failed setting PROT_EXEC on page starting at 0x" << std::hex
+                << pair.first << std::endl;
+      result = ErrorMProtectFailure;
+      goto exit;
+    }
+  }
 
   // TODO: patch each function with jump to hook location
+  result = Success;
 
-  // TODO: restore original memory protection
+exit:
+  // Restore original memory protection.
+  for (const auto &pair : _pagePermissions) {
+    if (::mprotect(reinterpret_cast<void *>(pair.first), _pageSize,
+                   pair.second) != 0) {
+      std::cerr << "failed to restore permissions on page starting at 0x"
+                << std::hex << pair.first << std::endl;
+    }
+  }
 
-  return ErrorNotImplemented;
+  return result;
 }
 
 Transaction::ResultCode Transaction::abort() {

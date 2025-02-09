@@ -16,10 +16,9 @@
 
 #pragma once
 
-#include <charconv>
 #include <cstdint>
+#include <optional>
 #include <span>
-#include <string>
 #include <string_view>
 #include <vector>
 
@@ -42,6 +41,8 @@ public:
   std::span<const Region> regions() const {
     return {_regions.data(), _regions.size()};
   }
+
+  std::optional<Region> find(std::uintptr_t addr) const;
 
 private:
   std::vector<Region> _regions;

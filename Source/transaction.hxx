@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -30,6 +31,8 @@ public:
     ErrorNotImplemented,
     ErrorInvalidState,
     ErrorSymbolNotFound,
+    ErrorUnexpected,
+    ErrorMProtectFailure,
   };
 
   class Builder {
@@ -69,10 +72,13 @@ private:
       : _state(TxnInitialized), _names(std::move(names)),
         _hook_addrs(std::move(hook_addrs)) {}
 
+  static std::size_t _pageSize;
+
   State _state;
   std::vector<std::string_view> _names;
   std::vector<std::uintptr_t> _hook_addrs;
   std::vector<Symbols::Descriptor> _descriptors;
+  std::unordered_map<uintptr_t, int> _pagePermissions;
 };
 
 }; // namespace Interject

@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+#include <charconv>
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
 
 #include <sys/mman.h>
@@ -67,6 +69,21 @@ bool MemoryMap::load(const std::string_view &file_name) {
   }
 
   return true;
+}
+
+std::optional<MemoryMap::Region> MemoryMap::find(std::uintptr_t addr) const {
+  for (const auto &region : regions()) {
+    if (addr < region.start) {
+      // regions are sorted in address order, so if the requested addr falls
+      // before this region, it won't exist in any subsequent region either.
+      break;
+    }
+
+    if (addr >= region.start && addr < region.end) {
+      return region;
+    }
+  }
+  return std::nullopt;
 }
 
 }; // namespace Interject
