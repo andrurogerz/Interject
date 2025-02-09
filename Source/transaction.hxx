@@ -33,6 +33,7 @@ public:
     ErrorSymbolNotFound,
     ErrorUnexpected,
     ErrorMProtectFailure,
+    ErrorFunctionBodyTooSmall,
   };
 
   class Builder {
@@ -40,18 +41,18 @@ public:
     template <typename T>
     Builder &add(const std::string_view &name, T *hook, T **trampoline) {
       names.emplace_back(name);
-      hook_addrs.emplace_back(reinterpret_cast<std::uintptr_t>(hook));
+      hooks.emplace_back(reinterpret_cast<std::uintptr_t>(hook));
       trampoline_addrs.emplace_back(reinterpret_cast<std::uintptr_t*>(trampoline));
       return *this;
     }
 
     Transaction build() const {
-      return Transaction(std::move(names), std::move(hook_addrs));
+      return Transaction(std::move(names), std::move(hooks));
     }
 
   private:
     std::vector<std::string_view> names;
-    std::vector<std::uintptr_t> hook_addrs;
+    std::vector<std::uintptr_t> hooks;
     std::vector<std::uintptr_t*> trampoline_addrs;
   };
 
@@ -70,15 +71,15 @@ private:
   };
 
   Transaction(const std::vector<std::string_view> &&names,
-              const std::vector<std::uintptr_t> hook_addrs)
+              const std::vector<std::uintptr_t> hooks)
       : _state(TxnInitialized), _names(std::move(names)),
-        _hook_addrs(std::move(hook_addrs)) {}
+        _hooks(std::move(hooks)) {}
 
   static std::size_t _pageSize;
 
   State _state;
   std::vector<std::string_view> _names;
-  std::vector<std::uintptr_t> _hook_addrs;
+  std::vector<std::uintptr_t> _hooks;
   std::vector<Symbols::Descriptor> _descriptors;
   std::unordered_map<uintptr_t, int> _pagePermissions;
 };

@@ -18,11 +18,16 @@
 #include "memory_map.hxx"
 #include "symbols.hxx"
 
+#include <array>
+#include <cstdint>
+#include <cstring>
 #include <format>
 #include <iostream>
 
 #include <sys/mman.h>
 #include <unistd.h>
+
+#include "patch.hxx"
 
 namespace Interject {
 
@@ -44,7 +49,15 @@ Transaction::ResultCode Transaction::prepare() {
 
   std::unordered_map<uintptr_t, int> pagePermissions;
   for (size_t idx = 0; idx < _names.size(); idx++) {
-    const auto addr = descriptors[idx].addr;
+    auto descriptor = descriptors[idx];
+
+    if (Patch::jumpToSize() > descriptor.size) {
+      std::cerr << std::format("function {} too small to patch", _names[idx])
+                << std::endl;
+      return ErrorFunctionBodyTooSmall;
+    }
+
+    const auto addr = descriptor.addr;
     if (addr == 0) {
       return ErrorSymbolNotFound;
     }
@@ -77,7 +90,7 @@ Transaction::ResultCode Transaction::commit() {
   ResultCode result = Success;
 
   for (const auto &pair : _pagePermissions) {
-    const int prot = pair.second | PROT_EXEC;
+    const int prot = pair.second | PROT_WRITE;
     if (::mprotect(reinterpret_cast<void *>(pair.first), _pageSize, prot) !=
         0) {
       std::cerr << "failed setting PROT_EXEC on page starting at 0x" << std::hex
@@ -87,7 +100,22 @@ Transaction::ResultCode Transaction::commit() {
     }
   }
 
-  // TODO: patch each function with jump to hook location
+  // TODO: pause all other threads and ensure none is executing the target
+  // instructino sequence before patching.
+
+  // Patch each function with jump to hook location.
+  for (size_t idx = 0; idx < _descriptors.size(); idx++) {
+    const auto &descriptor = _descriptors[idx];
+    const auto targetAddr = reinterpret_cast<char *>(descriptor.addr);
+    const uintptr_t hookAddr = _hooks[idx];
+
+    auto instrBytes = Patch::createJumpTo(hookAddr);
+    std::memcpy(targetAddr, &instrBytes, sizeof(instrBytes));
+
+    // clear icache
+    __builtin___clear_cache(targetAddr,targetAddr + sizeof(instrBytes));
+  }
+
   result = Success;
 
 exit:

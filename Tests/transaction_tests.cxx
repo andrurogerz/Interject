@@ -17,15 +17,19 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_test_macros.hpp>
 
+#include <iostream>
+
 #include <transaction.hxx>
 
 using namespace Interject;
 
 extern "C" ssize_t test_fn_add(ssize_t arg1, ssize_t arg2) {
+  std::cerr << "----> test_fn_add" << std::endl;
   return arg1 + arg2;
 }
 
 extern "C" ssize_t test_fn_sub(size_t arg1, ssize_t arg2) {
+  std::cerr << "----> test_fn_sub" << std::endl;
   return arg1 - arg2;
 }
 
@@ -33,11 +37,13 @@ ssize_t (*test_fn_add_trampoline)(ssize_t arg1, ssize_t arg2);
 ssize_t (*test_fn_sub_trampoline)(ssize_t arg1, ssize_t arg2);
 
 ssize_t hook_fn_add(ssize_t arg1, ssize_t arg2) {
+  std::cerr << "----> hook_fn_add" << std::endl;
   // TODO call test_fn_add_trampoline
   return 7;
 }
 
 ssize_t hook_fn_sub(ssize_t arg1, ssize_t arg2) {
+  std::cerr << "----> hook_fn_sub" << std::endl;
   // TODO call test_fn_sub_trampoline
   return 12;
 }
@@ -50,4 +56,7 @@ TEST_CASE("Create and abort transaction", "[transaction]") {
     .build();
   CHECK(txn.prepare() == Transaction::ResultCode::Success);
   CHECK(txn.commit() == Transaction::ResultCode::Success);
+
+  CHECK(test_fn_add(1, 1) == 7);
+  CHECK(test_fn_sub(1, 1) == 12);
 }
