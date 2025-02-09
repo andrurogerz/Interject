@@ -37,10 +37,11 @@ public:
 
   class Builder {
   public:
-    template <typename TFn>
-    Builder &add(const std::string_view &name, TFn hook) {
+    template <typename T>
+    Builder &add(const std::string_view &name, T *hook, T **trampoline) {
       names.emplace_back(name);
       hook_addrs.emplace_back(reinterpret_cast<std::uintptr_t>(hook));
+      trampoline_addrs.emplace_back(reinterpret_cast<std::uintptr_t*>(trampoline));
       return *this;
     }
 
@@ -51,6 +52,7 @@ public:
   private:
     std::vector<std::string_view> names;
     std::vector<std::uintptr_t> hook_addrs;
+    std::vector<std::uintptr_t*> trampoline_addrs;
   };
 
   ResultCode prepare();

@@ -29,9 +29,25 @@ extern "C" ssize_t test_fn_sub(size_t arg1, ssize_t arg2) {
   return arg1 - arg2;
 }
 
+ssize_t (*test_fn_add_trampoline)(ssize_t arg1, ssize_t arg2);
+ssize_t (*test_fn_sub_trampoline)(ssize_t arg1, ssize_t arg2);
+
+ssize_t hook_fn_add(ssize_t arg1, ssize_t arg2) {
+  // TODO call test_fn_add_trampoline
+  return 7;
+}
+
+ssize_t hook_fn_sub(ssize_t arg1, ssize_t arg2) {
+  // TODO call test_fn_sub_trampoline
+  return 12;
+}
+
 TEST_CASE("Create and abort transaction", "[transaction]") {
-  Interject::Transaction txn =
-      Transaction::Builder().add("test_fn_add", test_fn_sub).build();
+  //auto hook = hook_fn_add;
+  Interject::Transaction txn = Transaction::Builder()
+    .add("test_fn_add", hook_fn_add, &test_fn_add_trampoline)
+    .add("test_fn_sub", hook_fn_sub, &test_fn_sub_trampoline)
+    .build();
   CHECK(txn.prepare() == Transaction::ResultCode::Success);
   CHECK(txn.commit() == Transaction::ResultCode::Success);
 }
