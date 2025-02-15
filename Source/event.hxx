@@ -28,17 +28,17 @@ public:
   Event();
 
   // Reset the event from set to unset. Noop if the event is not already set.
-  void Reset();
+  void Reset() noexcept;
 
   // Set the event an unblock all waiters. Noop if the event is already set.
-  void Set();
+  void Set() noexcept;
 
   // Wait for the event to transition from unset to set. Returns immediately if
   // the event is already set.
-  [[nodiscard]] bool Wait(struct timespec *timeout) const;
+  [[nodiscard]] bool Wait(struct timespec *timeout) const noexcept;
 
   // Wait with infinite timeout.
-  void Wait() const { (void)Wait(nullptr); }
+  void Wait() const noexcept { (void)Wait(nullptr); }
 
 private:
   static constexpr std::uint32_t EVENT_VALUE_UNSET = 0;

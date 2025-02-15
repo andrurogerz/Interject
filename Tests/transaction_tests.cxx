@@ -89,11 +89,11 @@ TEST_CASE("Multiple threads during transaction", "[thread, transaction]") {
 
   // Create many threads that are continually calling the target functions
   // in a tight loop in an attempt to race with the commit call patching the
-  // code. This will lead to undefined behavior and, hopefully, crash the test
-  // process. Typically it will crash with SIGILL or SIGSEGV, but it is not
-  // guaranteed to always crash. Increating the number of threads should
-  // increase the chance that will crash.
-  constexpr size_t threadCount = 32;
+  // code. If patching occurs concurrently with execution, it will lead to
+  // undefined behavior and hopefully crash the application with SIGILL or
+  // SIGSEGV. Since Transaction::commit intends to avoid this situation, it
+  // should proceed without issue.
+  constexpr size_t threadCount = 50;
   pthread_t threadIds[threadCount];
   for (size_t i = 0; i < threadCount; i++) {
     CHECK_FALSE(pthread_create(&threadIds[i], &attr, testThread, nullptr));
@@ -104,6 +104,8 @@ TEST_CASE("Multiple threads during transaction", "[thread, transaction]") {
   CHECK(txn.commit() == Transaction::ResultCode::Success);
 
   for (size_t i = 0; i < threadCount; i++) {
+    // Threads will exit after test_fn_return_bool has been patched to call
+    // test_fn_return_not_bool.
     CHECK_FALSE(pthread_join(threadIds[i], nullptr));
   }
 }

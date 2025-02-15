@@ -14,13 +14,16 @@
  * limitations under the License.
  */
 
+#include "event.hxx"
+#include "symbols.hxx"
+
 #include <cstdint>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include "symbols.hxx"
+#include <signal.h>
 
 namespace Interject {
 
@@ -32,8 +35,10 @@ public:
     ErrorInvalidState,
     ErrorSymbolNotFound,
     ErrorUnexpected,
-    ErrorMProtectFailure,
+    ErrorMemoryProtectionFailure,
+    ErrorSignalActionFailure,
     ErrorFunctionBodyTooSmall,
+    ErrorTimedOut,
   };
 
   class Builder {
@@ -59,8 +64,6 @@ public:
 
   ResultCode prepare();
 
-  ResultCode abort();
-
   ResultCode commit();
 
 private:
@@ -71,15 +74,38 @@ private:
     TxnCommitted,
   };
 
+  struct ThreadControlBlock {
+    static constexpr size_t MAX_FRAME_COUNT = 64;
+    pid_t tid;
+    Event handlerWork;
+    Event handlerExit;
+    size_t frameCount;
+    void *frames[MAX_FRAME_COUNT];
+  };
+
   Transaction(const std::vector<std::string_view> &&names,
               const std::vector<std::uintptr_t> hooks)
       : _state(TxnInitialized), _names(std::move(names)),
         _hooks(std::move(hooks)) {}
 
-  bool isPatchTarget(std::uintptr_t addr) const;
-  ResultCode preparePagesForWrite() const;
-  ResultCode restorePagePermissions() const;
-  ResultCode stopAllThreads() const;
+  Transaction(const Transaction&) = delete;
+  Transaction &operator=(const Transaction&) = delete;
+
+  [[nodiscard]]
+  bool isPatchTarget(std::uintptr_t addr) const noexcept;
+
+  [[nodiscard]]
+  ResultCode preparePagesForWrite() const noexcept;
+
+  [[nodiscard]]
+  ResultCode restorePagePermissions() const noexcept;
+
+  [[nodiscard]]
+  ResultCode haltThread(pid_t targetTid,
+                        ThreadControlBlock &controlBlock) const noexcept;
+
+  static void backtraceHandler(int signal, siginfo_t *info,
+                               void *context) noexcept;
 
   static std::size_t _pageSize;
 

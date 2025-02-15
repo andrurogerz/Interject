@@ -16,8 +16,7 @@
 
 #pragma once
 
-#include <cassert>
-
+#include <errno.h>
 #include <signal.h>
 
 namespace Interject {
@@ -26,9 +25,12 @@ class SignalAction {
 public:
   using Action = void (*)(int, siginfo_t *, void *);
 
-  SignalAction(int signal, Action action, int flags) : _signal(signal) {
+  explicit SignalAction(int signal, Action action, int flags)
+      : _signal(signal), _failed(false), _error(0) {
     if (::sigaction(signal, nullptr, &_origAction) == -1) {
-      assert(!"sigaction failed");
+      _failed = true;
+      _error = errno;
+      return;
     }
 
     struct sigaction newAction;
@@ -37,18 +39,36 @@ public:
     sigemptyset(&newAction.sa_mask);
 
     if (::sigaction(_signal, &newAction, nullptr) == -1) {
-      assert(!"sigaction failed");
+      _failed = true;
+      _error = errno;
+      return;
     }
   }
 
   ~SignalAction() {
-    if (::sigaction(_signal, &_origAction, nullptr) == -1) {
-      assert(!"sigaction failed");
+    if (!_failed) {
+      // Really nothing we can do if sigaction fails here.
+      (void)::sigaction(_signal, &_origAction, nullptr);
     }
   }
 
+  [[nodiscard]]
+  bool failed() const {
+    return _failed;
+  }
+
+  [[nodiscard]]
+  int error() const {
+    return _error;
+  }
+
+  SignalAction(const SignalAction &) = delete;
+  SignalAction &operator=(const SignalAction &) = delete;
+
 private:
   int _signal;
+  int _error;
+  bool _failed;
   struct sigaction _origAction;
 };
 

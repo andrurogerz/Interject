@@ -30,11 +30,11 @@ Event::Event() {
   __atomic_store_n(&_value, EVENT_VALUE_UNSET, __ATOMIC_RELEASE);
 }
 
-void Event::Reset() {
+void Event::Reset() noexcept {
   __atomic_store_n(&this->_value, EVENT_VALUE_UNSET, __ATOMIC_RELEASE);
 }
 
-void Event::Set() {
+void Event::Set() noexcept {
   const uint32_t value =
       __atomic_exchange_n(&this->_value, EVENT_VALUE_SET, __ATOMIC_RELEASE);
   if (value == EVENT_VALUE_UNSET) {
@@ -47,7 +47,7 @@ void Event::Set() {
 }
 
 [[nodiscard]]
-bool Event::Wait(struct timespec *timeout) const {
+bool Event::Wait(struct timespec *timeout) const noexcept {
   for (;;) {
     const uint32_t value = __atomic_load_n(&this->_value, __ATOMIC_ACQUIRE);
     if (value == EVENT_VALUE_SET) {
