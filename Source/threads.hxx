@@ -13,20 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #pragma once
 
-#include <cstdint>
 #include <functional>
-#include <string_view>
+#include <optional>
 
-namespace Interject::Modules {
-using Callback =
-    std::function<void(std::string_view obj_name, std::uintptr_t base_addr)>;
+#include <unistd.h>
 
-// Iterate the current process linkmap and invoke a callback for each loaded
-// module.
-void forEach(Callback);
+namespace Interject::Threads {
+using Callback = std::function<void(pid_t pid)>;
 
-// Return the executable file path for the current process.
-std::string getExecutablePath();
-}; // namespace Interject::Modules
+// Iterate all threads in the current process.
+bool forEach(Callback);
+
+std::optional<std::vector<pid_t>> all();
+
+}; // namespace Interject::Threads

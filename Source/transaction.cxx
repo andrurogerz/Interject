@@ -14,20 +14,23 @@
  * limitations under the License.
  */
 
-#include "transaction.hxx"
+#include "event.hxx"
 #include "memory_map.hxx"
+#include "patch.hxx"
+#include "signal_action.hxx"
 #include "symbols.hxx"
+#include "threads.hxx"
+#include "transaction.hxx"
+#include "unwind.hxx"
 
-#include <array>
 #include <cstdint>
 #include <cstring>
 #include <format>
 #include <iostream>
 
+#include <signal.h>
 #include <sys/mman.h>
 #include <unistd.h>
-
-#include "patch.hxx"
 
 namespace Interject {
 
@@ -85,47 +88,217 @@ Transaction::ResultCode Transaction::prepare() {
   return Success;
 }
 
-Transaction::ResultCode Transaction::commit() {
-  // Prepare the first page of every hooked function to be writable.
-  ResultCode result = Success;
+constexpr size_t MAX_FRAME_COUNT = 128;
+struct ThreadControl {
+  pid_t tid;
+  Event handlerWork;
+  Event handlerExit;
+  size_t stackFrameCount;
+  void *stackFrames[MAX_FRAME_COUNT];
+};
 
+static void backtraceHandler(int signal, siginfo_t *info, void *context) {
+  const pid_t tid = ::gettid();
+  if (info->si_signo != SIGUSR1) {
+    // Received an unexpected signal. This should never happen.
+    return;
+  }
+
+  ThreadControl *threadControl =
+      reinterpret_cast<ThreadControl *>(info->si_value.sival_ptr);
+  const pid_t targetTid =
+      __atomic_load_n(&threadControl->tid, __ATOMIC_ACQUIRE);
+  __atomic_store_n(&threadControl->tid, tid, __ATOMIC_RELEASE);
+  if (targetTid != tid) {
+    // This signal handler is running on a different thread than the signaller
+    // expected. It might even be running on the signalling thread itself. In
+    // this case, immediately signal completion after memoizing our actual tid
+    // and don't block before returning. The signaller is responsible for
+    // checking the memoized tid against the tid it expected to run the handler
+    // and to retry if necessary.
+    threadControl->handlerWork.Set();
+    return;
+  }
+
+  const size_t frameCount =
+      Unwind::backtrace(std::span(threadControl->stackFrames));
+  for (size_t idx = 0; idx < frameCount; idx++) {
+    // Force memory barriers on all of the stack frames.
+    const auto frame = threadControl->stackFrames[idx];
+    __atomic_store_n(&threadControl->stackFrames[idx], frame, __ATOMIC_RELEASE);
+  }
+  __atomic_store_n(&threadControl->stackFrameCount, frameCount,
+                   __ATOMIC_RELEASE);
+  threadControl->handlerExit.Reset();
+  threadControl->handlerWork
+      .Set(); // let the signaller know we're done capturing backtrace
+  threadControl->handlerExit
+      .Wait(); // wait for the signaller to release us before returning
+}
+
+Transaction::ResultCode Transaction::preparePagesForWrite() const {
   for (const auto &pair : _pagePermissions) {
     const int prot = pair.second | PROT_WRITE;
     if (::mprotect(reinterpret_cast<void *>(pair.first), _pageSize, prot) !=
         0) {
       std::cerr << "failed setting PROT_EXEC on page starting at 0x" << std::hex
                 << pair.first << std::endl;
-      result = ErrorMProtectFailure;
-      goto exit;
+      return ErrorMProtectFailure;
     }
   }
+  return Success;
+}
 
-  // TODO: pause all other threads and ensure none is executing the target
-  // instructino sequence before patching.
-
-  // Patch each function with jump to hook location.
-  for (size_t idx = 0; idx < _descriptors.size(); idx++) {
-    const auto &descriptor = _descriptors[idx];
-    const auto targetAddr = reinterpret_cast<char *>(descriptor.addr);
-    const uintptr_t hookAddr = _hooks[idx];
-
-    auto instrBytes = Patch::createJumpTo(hookAddr);
-    std::memcpy(targetAddr, &instrBytes, sizeof(instrBytes));
-
-    // clear icache
-    __builtin___clear_cache(targetAddr,targetAddr + sizeof(instrBytes));
-  }
-
-  result = Success;
-
-exit:
-  // Restore original memory protection.
+Transaction::ResultCode Transaction::restorePagePermissions() const {
   for (const auto &pair : _pagePermissions) {
     if (::mprotect(reinterpret_cast<void *>(pair.first), _pageSize,
                    pair.second) != 0) {
       std::cerr << "failed to restore permissions on page starting at 0x"
                 << std::hex << pair.first << std::endl;
+      return ErrorMProtectFailure;
     }
+  }
+  return Success;
+}
+
+bool Transaction::isPatchTarget(std::uintptr_t addr) const {
+  const std::size_t patchSize = Patch::jumpToSize();
+  for (auto &descriptor : _descriptors) {
+    if (addr < descriptor.addr || addr >= descriptor.addr + patchSize) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
+
+Transaction::ResultCode Transaction::commit() {
+  // First, prepare the first page of every hooked function to be writable.
+  ResultCode result = preparePagesForWrite();
+  if (result != Success) {
+    return result;
+  }
+
+  std::optional<std::vector<pid_t>> threads;
+
+  // We have to do a bit of a complex dance when patching the target code with
+  // a new instruction sequence. The primary issue driving the complexity is
+  // that any other thread in the process may be concurrently executing the
+  // target instruction sequence that we intend to patch. Altering the sequence
+  // mid-execution will result in undefined behavior.
+  //
+  // The solution is to signal every other thread in the process, determine if
+  // its instruction pointer is in a patch range, and keep it from resuming
+  // until all patches are applied. In the unlikely case that a thread is
+  // currently executing in a patch range, we bail out, sleep briefly, and try
+  // try again. We retry until all threads are suspended
+  //
+  // Additionally, we should handle the rare case where a thread is created
+  // concurrently to the patching process. But for now we'll pretend that case
+  // never occurs. Hopefully it is unlikely that any thread created concurrently
+  // will not execute instructions in the patch range while we're patching. At
+  // any rate, it will be tricky to test this scenario.
+
+  std::optional<std::vector<pid_t>> tids = Threads::all();
+  if (!tids) {
+    std::cerr << "failed enumerating all threads" << std::endl;
+    restorePagePermissions();
+    return ErrorInvalidState;
+  }
+
+  std::vector<ThreadControl> threadControls(tids->size());
+
+  for (size_t idx = 0; (result == Success) && (idx < tids->size()); idx++) {
+    const pid_t targetTid = (*tids)[idx];
+    if (targetTid == ::gettid()) {
+      // Skip the current thread to avoid deadlock. We know it isn't executing
+      // the target code so this is fine.
+      continue;
+    }
+
+    size_t retryWaitUs = 1;
+
+    struct timespec timeout = {0};
+    timeout.tv_sec = 1;
+
+    ThreadControl *threadControl = &threadControls[idx];
+    SignalAction action(SIGUSR1, backtraceHandler, SA_SIGINFO);
+
+    bool retry;
+    do {
+      __atomic_store_n(&threadControl->tid, targetTid, __ATOMIC_RELEASE);
+      threadControl->handlerWork.Reset();
+
+      if (::sigqueue(targetTid, SIGUSR1,
+                     (union sigval){.sival_ptr = threadControl}) == -1) {
+        std::cerr << std::format("failed to signal tid:{:#x} errno:{} ({})\n",
+                                 targetTid, errno, ::strerror(errno));
+        result = ErrorInvalidState; // TODO: better error code
+        break;
+      }
+
+      if (!threadControl->handlerWork.Wait(&timeout)) {
+        std::cerr << std::format(
+            "timed out waiting for tid:{:#x} to be signalled\n", targetTid);
+        result = ErrorInvalidState; // TODO: better error code
+        break;
+      }
+
+      const pid_t actualTid =
+          __atomic_load_n(&threadControl->tid, __ATOMIC_ACQUIRE);
+
+      // If the handler ran on a different thread than we expected (most likely
+      // on this thread), the handler exited without capturing a backtrace. In
+      // this situation we need to retry.
+      if ((retry = actualTid != targetTid)) {
+        continue;
+      }
+
+      for (size_t jdx = 0; jdx < threadControl->stackFrameCount; jdx++) {
+        const auto frame =
+            __atomic_load_n(&threadControl->stackFrames[jdx], __ATOMIC_ACQUIRE);
+        if ((retry = isPatchTarget(reinterpret_cast<uintptr_t>(frame)))) {
+          break;
+        }
+      }
+
+      if (retry) {
+        // Let the handler exit immediately so we can signal it again and try to
+        // capture it executing in a different location.
+        threadControl->handlerExit.Set();
+
+        // Expontntial backoff (up to 1s) on retry to give the handler a chance
+        // to exit and the thread a chance to run past the patch target
+        // instructions.
+        if (retryWaitUs > 1000000) {
+          result = ErrorInvalidState; // TODO: Better error code
+          break;
+        }
+
+        ::usleep(retryWaitUs);
+        retryWaitUs = retryWaitUs << 1;
+      }
+    } while (retry);
+  }
+
+  if (result == Success) {
+    // Patch each function with jump to hook location.
+    for (size_t idx = 0; idx < _descriptors.size(); idx++) {
+      const auto &descriptor = _descriptors[idx];
+      const auto targetAddr = reinterpret_cast<char *>(descriptor.addr);
+      const uintptr_t hookAddr = _hooks[idx];
+
+      auto instrBytes = Patch::createJumpTo(hookAddr);
+      std::memcpy(targetAddr, &instrBytes, sizeof(instrBytes));
+
+      // Flush the instruction cache after patching.
+      __builtin___clear_cache(targetAddr, targetAddr + sizeof(instrBytes));
+    }
+  }
+
+  restorePagePermissions();
+  for (auto &threadControl : threadControls) {
+    threadControl.handlerExit.Set();
   }
 
   return result;

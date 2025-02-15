@@ -42,7 +42,8 @@ public:
     Builder &add(const std::string_view &name, T *hook, T **trampoline) {
       names.emplace_back(name);
       hooks.emplace_back(reinterpret_cast<std::uintptr_t>(hook));
-      trampoline_addrs.emplace_back(reinterpret_cast<std::uintptr_t*>(trampoline));
+      trampoline_addrs.emplace_back(
+          reinterpret_cast<std::uintptr_t *>(trampoline));
       return *this;
     }
 
@@ -53,7 +54,7 @@ public:
   private:
     std::vector<std::string_view> names;
     std::vector<std::uintptr_t> hooks;
-    std::vector<std::uintptr_t*> trampoline_addrs;
+    std::vector<std::uintptr_t *> trampoline_addrs;
   };
 
   ResultCode prepare();
@@ -74,6 +75,11 @@ private:
               const std::vector<std::uintptr_t> hooks)
       : _state(TxnInitialized), _names(std::move(names)),
         _hooks(std::move(hooks)) {}
+
+  bool isPatchTarget(std::uintptr_t addr) const;
+  ResultCode preparePagesForWrite() const;
+  ResultCode restorePagePermissions() const;
+  ResultCode stopAllThreads() const;
 
   static std::size_t _pageSize;
 

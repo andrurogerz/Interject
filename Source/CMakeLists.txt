@@ -24,10 +24,13 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(elfio)
 
 add_library(libInterject STATIC
+  event.cxx
   memory_map.cxx
   modules.cxx
   symbols.cxx
+  threads.cxx
   transaction.cxx
+  unwind.cxx
 )
 target_include_directories(libInterject PUBLIC include)
 target_include_directories(libInterject PRIVATE ${elfio_SOURCE_DIR})

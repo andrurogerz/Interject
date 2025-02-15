@@ -13,20 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #pragma once
 
 #include <cstdint>
-#include <functional>
-#include <string_view>
+#include <span>
 
-namespace Interject::Modules {
-using Callback =
-    std::function<void(std::string_view obj_name, std::uintptr_t base_addr)>;
+namespace Interject::Unwind {
 
-// Iterate the current process linkmap and invoke a callback for each loaded
-// module.
-void forEach(Callback);
+std::size_t backtrace(std::span<void *> stackFrames);
 
-// Return the executable file path for the current process.
-std::string getExecutablePath();
-}; // namespace Interject::Modules
+}; // namespace Interject::Unwind
