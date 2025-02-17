@@ -66,12 +66,19 @@ public:
 
   ResultCode commit();
 
+  ResultCode rollback();
+
 private:
   enum State {
     TxnInitialized = 0,
     TxnPrepared,
     TxnAborted,
     TxnCommitted,
+  };
+
+  enum PatchCommand {
+    Apply = 0,
+    Restore = 1,
   };
 
   struct ThreadControlBlock {
@@ -104,6 +111,9 @@ private:
   ResultCode haltThread(pid_t targetTid,
                         ThreadControlBlock &controlBlock) const noexcept;
 
+  [[nodiscard]]
+  ResultCode patch(PatchCommand command);
+
   static void backtraceHandler(int signal, siginfo_t *info,
                                void *context) noexcept;
 
@@ -114,6 +124,7 @@ private:
   std::vector<std::uintptr_t> _hooks;
   std::vector<Symbols::Descriptor> _descriptors;
   std::unordered_map<uintptr_t, int> _pagePermissions;
+  std::vector<std::vector<uint8_t>> _origInstrs;
 };
 
 }; // namespace Interject

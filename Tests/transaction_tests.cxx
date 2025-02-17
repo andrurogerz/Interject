@@ -54,6 +54,11 @@ TEST_CASE("Create and abort transaction", "[transaction]") {
 
   CHECK(test_fn_add(1, 1) == 0);
   CHECK(test_fn_sub(1, 1) == 2);
+
+  CHECK(txn.rollback() == Transaction::ResultCode::Success);
+
+  CHECK(test_fn_add(1, 1) == 2);
+  CHECK(test_fn_sub(1, 1) == 0);
 }
 
 extern "C" __attribute__((noinline)) bool test_fn_return_bool(bool value) {

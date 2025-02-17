@@ -15,6 +15,7 @@
  */
 
 #include "transaction.hxx"
+#include "disassembler.hxx"
 #include "memory_map.hxx"
 #include "patch.hxx"
 #include "scope_guard.hxx"
@@ -51,6 +52,8 @@ Transaction::ResultCode Transaction::prepare() {
   }
 
   std::unordered_map<uintptr_t, int> pagePermissions;
+  std::vector<std::vector<uint8_t>> origInstrs;
+
   for (size_t idx = 0; idx < _names.size(); idx++) {
     auto descriptor = descriptors[idx];
 
@@ -64,6 +67,14 @@ Transaction::ResultCode Transaction::prepare() {
     if (addr == 0) {
       return ErrorSymbolNotFound;
     }
+
+    auto instrs = Disassembler::copyInstrs(descriptor.addr, descriptor.size,
+                                           Patch::jumpToSize());
+    if (!instrs) {
+      return ErrorUnexpected;
+    }
+
+    origInstrs.emplace_back(std::vector<uint8_t>(instrs->begin(), instrs->end()));
 
     const auto page_addr = addr & ~(_pageSize - 1);
     if (pagePermissions.find(page_addr) != pagePermissions.end()) {
@@ -85,6 +96,7 @@ Transaction::ResultCode Transaction::prepare() {
   _state = TxnPrepared;
   _descriptors = std::move(descriptors);
   _pagePermissions = std::move(pagePermissions);
+  _origInstrs = std::move(origInstrs);
   return Success;
 }
 
@@ -228,7 +240,7 @@ Transaction::ResultCode Transaction::haltThread(
   return Success;
 }
 
-Transaction::ResultCode Transaction::commit() {
+Transaction::ResultCode Transaction::patch(PatchCommand command) {
   // First, prepare the first page of every hooked function to be writable so
   // we can overwrite the first few instructions with a jump to the replacement
   // function.
@@ -303,17 +315,36 @@ Transaction::ResultCode Transaction::commit() {
   // Patch each function with jump to hook location.
   for (size_t idx = 0; idx < _descriptors.size(); idx++) {
     const auto &descriptor = _descriptors[idx];
-    const auto targetAddr = reinterpret_cast<char *>(descriptor.addr);
+    const auto targetAddr = reinterpret_cast<char*>(descriptor.addr);
     const uintptr_t hookAddr = _hooks[idx];
 
-    auto instrBytes = Patch::createJumpTo(hookAddr);
-    std::memcpy(targetAddr, &instrBytes, sizeof(instrBytes));
+    if (command == Apply) {
+      // Generate an instruction sequence that jumps to the hook address to
+      // patch over the existing function.
+      auto instrBytes = Patch::createJumpTo(hookAddr);
+      std::memcpy(targetAddr, instrBytes.data(), instrBytes.size());
 
-    // Flush the instruction cache after patching.
-    __builtin___clear_cache(targetAddr, targetAddr + sizeof(instrBytes));
+      // Flush the instruction cache after patching.
+      __builtin___clear_cache(targetAddr, targetAddr + instrBytes.size());
+
+    } else if (command == Restore) {
+      auto &instrBytes = _origInstrs[idx];
+      std::memcpy(targetAddr, instrBytes.data(), instrBytes.size());
+
+      // Flush the instruction cache after patching.
+      __builtin___clear_cache(targetAddr, targetAddr + instrBytes.size());
+    }
   }
 
   return Success;
+}
+
+Transaction::ResultCode Transaction::commit() {
+  return patch(Apply);
+}
+
+Transaction::ResultCode Transaction::rollback() {
+  return patch(Restore);
 }
 
 }; // namespace Interject
