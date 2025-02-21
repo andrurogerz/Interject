@@ -18,55 +18,38 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <iostream>
-
 #include <pthread.h>
 #include <unistd.h>
 
 #include <transaction.hxx>
 
+#include "functions.h"
+
 using namespace Interject;
 
-extern "C" __attribute__((noinline)) ssize_t test_fn_add(ssize_t arg1,
-                                                         ssize_t arg2) {
-  return arg1 + arg2;
-}
-
-extern "C" __attribute__((noinline)) ssize_t test_fn_sub(size_t arg1,
-                                                         ssize_t arg2) {
-  return arg1 - arg2;
-}
-
-ssize_t (*test_fn_add_trampoline)(ssize_t arg1, ssize_t arg2);
-ssize_t (*test_fn_sub_trampoline)(ssize_t arg1, ssize_t arg2);
-
-ssize_t hook_fn_add(ssize_t arg1, ssize_t arg2) { return arg1 + arg2; }
-
-ssize_t hook_fn_sub(ssize_t arg1, ssize_t arg2) { return arg1 - arg2; }
-
 TEST_CASE("Create and abort transaction", "[transaction]") {
+  const auto countSetBitsResult = count_set_bits(1234);
+  const auto fibonacciResult = fibonacci(10);
+  const auto isqrtResult = isqrt(64);
+  size_t (*trampoline)(size_t) = nullptr;
   Interject::Transaction txn =
       Transaction::Builder()
-          .add("test_fn_add", hook_fn_sub, &test_fn_add_trampoline)
-          .add("test_fn_sub", hook_fn_add, &test_fn_sub_trampoline)
+          .add("count_set_bits", sum_of_digits, &trampoline)
+          .add("fibonacci", factorial, &trampoline)
+          .add("isqrt", factorial, &trampoline)
           .build();
-  CHECK(txn.prepare() == Transaction::ResultCode::Success);
-  CHECK(txn.commit() == Transaction::ResultCode::Success);
+  REQUIRE(txn.prepare() == Transaction::ResultCode::Success);
+  REQUIRE(txn.commit() == Transaction::ResultCode::Success);
 
-  CHECK(test_fn_add(1, 1) == 0);
-  CHECK(test_fn_sub(1, 1) == 2);
+  CHECK(count_set_bits(1234) == sum_of_digits(1234));
+  CHECK(fibonacci(10) == factorial(10));
+  CHECK(isqrt(64) == factorial(64));
 
   CHECK(txn.rollback() == Transaction::ResultCode::Success);
 
-  CHECK(test_fn_add(1, 1) == 2);
-  CHECK(test_fn_sub(1, 1) == 0);
-}
-
-extern "C" __attribute__((noinline)) bool test_fn_return_bool(bool value) {
-  return value;
-}
-
-extern "C" __attribute__((noinline)) bool test_fn_return_not_bool(bool value) {
-  return !value;
+  CHECK(count_set_bits(1234) == countSetBitsResult);
+  CHECK(fibonacci(10) == fibonacciResult);
+  CHECK(isqrt(64) == isqrtResult);
 }
 
 bool (*test_fn_return_true_trampoline)(bool);
@@ -87,7 +70,7 @@ TEST_CASE("Multiple threads during transaction", "[thread, transaction]") {
           .add("test_fn_return_bool", test_fn_return_not_bool,
                &test_fn_return_true_trampoline)
           .build();
-  CHECK(txn.prepare() == Transaction::ResultCode::Success);
+  REQUIRE(txn.prepare() == Transaction::ResultCode::Success);
 
   pthread_attr_t attr;
   CHECK_FALSE(pthread_attr_init(&attr));

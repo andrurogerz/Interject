@@ -23,6 +23,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(InterjectTests
+  functions.c
   memory_map_tests.cxx
   symbol_tests.cxx
   transaction_tests.cxx

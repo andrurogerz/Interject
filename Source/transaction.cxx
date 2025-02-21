@@ -48,6 +48,7 @@ Transaction::ResultCode Transaction::prepare() {
 
   MemoryMap map;
   if (!map.load()) {
+    std::cerr << "Failed loading memory map\n";
     return ErrorUnexpected;
   }
 
@@ -58,8 +59,7 @@ Transaction::ResultCode Transaction::prepare() {
     auto descriptor = descriptors[idx];
 
     if (Patch::jumpToSize() > descriptor.size) {
-      std::cerr << std::format("function {} too small to patch", _names[idx])
-                << std::endl;
+      std::cerr << std::format("function {} too small to patch ({} < {} bytes)\n", _names[idx], descriptor.size, Patch::jumpToSize());
       return ErrorFunctionBodyTooSmall;
     }
 
@@ -71,23 +71,28 @@ Transaction::ResultCode Transaction::prepare() {
     auto instrs = Disassembler::copyInstrs(descriptor.addr, descriptor.size,
                                            Patch::jumpToSize());
     if (!instrs) {
+      std::cerr << "Failed disassembling function\n";
       return ErrorUnexpected;
     }
 
     origInstrs.emplace_back(std::vector<uint8_t>(instrs->begin(), instrs->end()));
 
-    const auto page_addr = addr & ~(_pageSize - 1);
-    if (pagePermissions.find(page_addr) != pagePermissions.end()) {
-      // This page is already present.
-      continue;
-    }
+    const auto pageMask = ~(_pageSize - 1);
+    const auto firstPageAddr = addr & pageMask;
+    const auto lastPageAddr = (addr + descriptor.size - 1) & pageMask;
 
-    const auto region = map.find(page_addr);
-    if (!region) {
-      return ErrorSymbolNotFound;
-    }
+    for (auto pageAddr = firstPageAddr; pageAddr <= lastPageAddr; pageAddr += _pageSize) {
+      if (pagePermissions.find(pageAddr) != pagePermissions.end()) {
+        continue;
+      }
 
-    pagePermissions[page_addr] = region->permissions;
+      const auto region = map.find(pageAddr);
+      if (!region) {
+        return ErrorSymbolNotFound;
+      }
+
+      pagePermissions[pageAddr] = region->permissions;
+    }
 
     // TODO: allocate trampoline and copy minimal instruction sequence from
     // the target function to the trampoline location.
@@ -322,6 +327,7 @@ Transaction::ResultCode Transaction::patch(PatchCommand command) {
       // Generate an instruction sequence that jumps to the hook address to
       // patch over the existing function.
       auto instrBytes = Patch::createJumpTo(hookAddr);
+
       std::memcpy(targetAddr, instrBytes.data(), instrBytes.size());
 
       // Flush the instruction cache after patching.
@@ -335,7 +341,6 @@ Transaction::ResultCode Transaction::patch(PatchCommand command) {
       __builtin___clear_cache(targetAddr, targetAddr + instrBytes.size());
     }
   }
-
   return Success;
 }
 
