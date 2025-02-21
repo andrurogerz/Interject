@@ -48,6 +48,7 @@ add_library(libInterject STATIC
   modules.cxx
   symbols.cxx
   threads.cxx
+  trampoline.cxx
   transaction.cxx
   unwind.cxx
 )

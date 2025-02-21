@@ -53,7 +53,7 @@ Transaction::ResultCode Transaction::prepare() {
   }
 
   std::unordered_map<uintptr_t, int> pagePermissions;
-  std::vector<std::vector<uint8_t>> origInstrs;
+  std::vector<Trampoline> trampolines;
 
   for (size_t idx = 0; idx < _names.size(); idx++) {
     auto descriptor = descriptors[idx];
@@ -68,14 +68,17 @@ Transaction::ResultCode Transaction::prepare() {
       return ErrorSymbolNotFound;
     }
 
-    auto instrs = Disassembler::copyInstrs(descriptor.addr, descriptor.size,
-                                           Patch::jumpToSize());
-    if (!instrs) {
-      std::cerr << "Failed disassembling function\n";
+    std::optional<Trampoline> trampoline = Trampoline::create(descriptor);
+    if (!trampoline) {
+      // TODO: better error code here
       return ErrorUnexpected;
     }
 
-    origInstrs.emplace_back(std::vector<uint8_t>(instrs->begin(), instrs->end()));
+    trampolines.push_back(std::move(*trampoline));
+
+    if (_trampolineAddrs[idx] != nullptr) {
+      *_trampolineAddrs[idx] = trampoline->start();
+    }
 
     const auto pageMask = ~(_pageSize - 1);
     const auto firstPageAddr = addr & pageMask;
@@ -93,15 +96,12 @@ Transaction::ResultCode Transaction::prepare() {
 
       pagePermissions[pageAddr] = region->permissions;
     }
-
-    // TODO: allocate trampoline and copy minimal instruction sequence from
-    // the target function to the trampoline location.
   }
 
   _state = TxnPrepared;
   _descriptors = std::move(descriptors);
   _pagePermissions = std::move(pagePermissions);
-  _origInstrs = std::move(origInstrs);
+  _trampolines = std::move(trampolines);
   return Success;
 }
 
@@ -334,11 +334,11 @@ Transaction::ResultCode Transaction::patch(PatchCommand command) {
       __builtin___clear_cache(targetAddr, targetAddr + instrBytes.size());
 
     } else if (command == Restore) {
-      auto &instrBytes = _origInstrs[idx];
-      std::memcpy(targetAddr, instrBytes.data(), instrBytes.size());
+      auto orig = _trampolines[idx].orig();
+      std::memcpy(targetAddr, orig.data(), orig.size());
 
       // Flush the instruction cache after patching.
-      __builtin___clear_cache(targetAddr, targetAddr + instrBytes.size());
+      __builtin___clear_cache(targetAddr, targetAddr + orig.size());
     }
   }
   return Success;

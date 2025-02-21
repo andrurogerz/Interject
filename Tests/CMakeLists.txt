@@ -26,6 +26,7 @@ add_executable(InterjectTests
   functions.c
   memory_map_tests.cxx
   symbol_tests.cxx
+  trampoline_tests.cxx
   transaction_tests.cxx
 )
 target_include_directories(InterjectTests PRIVATE ${CMAKE_SOURCE_DIR}/Source)

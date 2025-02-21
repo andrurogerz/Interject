@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include "event.hxx"
 #include "symbols.hxx"
+#include "trampoline.hxx"
 
 #include <cstdint>
 #include <string_view>
@@ -53,7 +56,7 @@ public:
     }
 
     Transaction build() const {
-      return Transaction(std::move(names), std::move(hooks));
+      return Transaction(std::move(names), std::move(hooks), std::move(trampoline_addrs));
     }
 
   private:
@@ -91,12 +94,15 @@ private:
   };
 
   Transaction(const std::vector<std::string_view> &&names,
-              const std::vector<std::uintptr_t> hooks)
+              const std::vector<std::uintptr_t> &&hooks,
+              const std::vector<std::uintptr_t*> &&trampolineAddrs)
       : _state(TxnInitialized), _names(std::move(names)),
-        _hooks(std::move(hooks)) {}
+        _hooks(std::move(hooks)), _trampolineAddrs(trampolineAddrs) {}
 
   Transaction(const Transaction&) = delete;
   Transaction &operator=(const Transaction&) = delete;
+
+  // TODO: add move ctor and move operator=
 
   [[nodiscard]]
   bool isPatchTarget(std::uintptr_t addr) const noexcept;
@@ -123,8 +129,9 @@ private:
   std::vector<std::string_view> _names;
   std::vector<std::uintptr_t> _hooks;
   std::vector<Symbols::Descriptor> _descriptors;
+  std::vector<std::uintptr_t *> _trampolineAddrs;
+  std::vector<Trampoline> _trampolines;
   std::unordered_map<uintptr_t, int> _pagePermissions;
-  std::vector<std::vector<uint8_t>> _origInstrs;
 };
 
 }; // namespace Interject
