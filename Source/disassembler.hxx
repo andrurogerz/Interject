@@ -23,6 +23,6 @@
 namespace Interject::Disassembler {
 
 std::optional<std::span<const uint8_t>> copyInstrs(std::uintptr_t startAddr,
-                                                   std::size_t codeSize,
+                                                   std::size_t maxCopySize,
                                                    std::size_t minCopySize);
 }; // namespace Interject::Disassembler

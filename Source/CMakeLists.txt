@@ -23,6 +23,24 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(elfio)
 
+block(SCOPE_FOR VARIABLES)
+  set(CAPSTONE_BUILD_TESTS OFF CACHE INTERNAL "")
+  set(CAPSTONE_BUILD_SHARED OFF CACHE INTERNAL "")
+  set(CAPSTONE_ARCHITECTURE_DEFAULT OFF CACHE INTERNAL "")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+    set(CAPSTONE_X86_SUPPORT ON CACHE INTERNAL "")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    set(CAPSTONE_ARM64_SUPPORT ON CACHE INTERNAL "")
+  endif()
+  FetchContent_Declare(
+    capstone
+    GIT_REPOSITORY    https://github.com/capstone-engine/capstone
+    GIT_TAG           5.0.5
+    FIND_PACKAGE_ARGS CONFIG
+  )
+  FetchContent_MakeAvailable(capstone)
+endblock()
+
 add_library(libInterject STATIC
   disassembler.cxx
   event.cxx
@@ -35,3 +53,4 @@ add_library(libInterject STATIC
 )
 target_include_directories(libInterject PUBLIC include)
 target_include_directories(libInterject PRIVATE ${elfio_SOURCE_DIR})
+target_link_libraries(libInterject PRIVATE capstone)
