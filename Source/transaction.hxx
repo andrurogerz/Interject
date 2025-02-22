@@ -41,6 +41,7 @@ public:
     ErrorMemoryProtectionFailure,
     ErrorSignalActionFailure,
     ErrorFunctionBodyTooSmall,
+    ErrorTrampolineCreationFailure,
     ErrorTimedOut,
   };
 
@@ -56,7 +57,8 @@ public:
     }
 
     Transaction build() const {
-      return Transaction(std::move(names), std::move(hooks), std::move(trampoline_addrs));
+      return Transaction(std::move(names), std::move(hooks),
+                         std::move(trampoline_addrs));
     }
 
   private:
@@ -75,7 +77,6 @@ private:
   enum State {
     TxnInitialized = 0,
     TxnPrepared,
-    TxnAborted,
     TxnCommitted,
   };
 
@@ -95,14 +96,32 @@ private:
 
   Transaction(const std::vector<std::string_view> &&names,
               const std::vector<std::uintptr_t> &&hooks,
-              const std::vector<std::uintptr_t*> &&trampolineAddrs)
+              const std::vector<std::uintptr_t *> &&trampolineAddrs) noexcept
       : _state(TxnInitialized), _names(std::move(names)),
         _hooks(std::move(hooks)), _trampolineAddrs(trampolineAddrs) {}
 
-  Transaction(const Transaction&) = delete;
-  Transaction &operator=(const Transaction&) = delete;
+  Transaction(const Transaction &) = delete;
+  Transaction &operator=(const Transaction &) = delete;
 
-  // TODO: add move ctor and move operator=
+  Transaction(Transaction &&other) noexcept
+      : _state(other._state), _names(std::move(other._names)),
+        _hooks(std::move(other._hooks)),
+        _descriptors(std::move(other._descriptors)),
+        _trampolineAddrs(std::move(other._trampolineAddrs)),
+        _trampolines(std::move(other._trampolines)),
+        _pagePermissions(std::move(other._pagePermissions)) {}
+
+  Transaction &operator=(Transaction &&other) noexcept {
+    if (this != &other) {
+      _state = other._state;
+      _names = std::move(other._names);
+      _descriptors = std::move(other._descriptors);
+      _trampolineAddrs = std::move(other._trampolineAddrs);
+      _trampolines = std::move(other._trampolines);
+      _pagePermissions = std::move(other._pagePermissions);
+    }
+    return *this;
+  }
 
   [[nodiscard]]
   bool isPatchTarget(std::uintptr_t addr) const noexcept;

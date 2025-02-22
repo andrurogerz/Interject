@@ -25,6 +25,8 @@ std::optional<Trampoline> Trampoline::create(Symbols::Descriptor symbol) {
   const std::size_t _origSize = symbol.size;
   const std::size_t _allocSize = symbol.size;
 
+  // TODO: allocating a min of one page per trampoline is very wasteful; we
+  // should colocate multiple trampolines per page.
   void *mem = ::mmap(nullptr, _allocSize, PROT_READ | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
   if (mem == nullptr) {
@@ -40,7 +42,6 @@ std::optional<Trampoline> Trampoline::create(Symbols::Descriptor symbol) {
     ::munmap(mem, symbol.size);
     return std::nullopt;
   }
-
   return Trampoline(reinterpret_cast<std::uintptr_t>(mem), _allocSize,
                     _origSize);
 }

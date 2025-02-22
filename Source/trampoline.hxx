@@ -50,9 +50,7 @@ public:
     return *this;
   }
 
-  std::uintptr_t start() const noexcept {
-    return _addr;
-  }
+  std::uintptr_t start() const noexcept { return _addr; }
 
   std::span<const uint8_t> orig() const noexcept {
     return std::span<const uint8_t>(reinterpret_cast<uint8_t *>(_addr),

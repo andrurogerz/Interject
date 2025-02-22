@@ -59,7 +59,9 @@ Transaction::ResultCode Transaction::prepare() {
     auto descriptor = descriptors[idx];
 
     if (Patch::jumpToSize() > descriptor.size) {
-      std::cerr << std::format("function {} too small to patch ({} < {} bytes)\n", _names[idx], descriptor.size, Patch::jumpToSize());
+      std::cerr << std::format(
+          "function {} too small to patch ({} < {} bytes)\n", _names[idx],
+          descriptor.size, Patch::jumpToSize());
       return ErrorFunctionBodyTooSmall;
     }
 
@@ -70,8 +72,7 @@ Transaction::ResultCode Transaction::prepare() {
 
     std::optional<Trampoline> trampoline = Trampoline::create(descriptor);
     if (!trampoline) {
-      // TODO: better error code here
-      return ErrorUnexpected;
+      return ErrorTrampolineCreationFailure;
     }
 
     trampolines.push_back(std::move(*trampoline));
@@ -84,7 +85,8 @@ Transaction::ResultCode Transaction::prepare() {
     const auto firstPageAddr = addr & pageMask;
     const auto lastPageAddr = (addr + descriptor.size - 1) & pageMask;
 
-    for (auto pageAddr = firstPageAddr; pageAddr <= lastPageAddr; pageAddr += _pageSize) {
+    for (auto pageAddr = firstPageAddr; pageAddr <= lastPageAddr;
+         pageAddr += _pageSize) {
       if (pagePermissions.find(pageAddr) != pagePermissions.end()) {
         continue;
       }
@@ -320,7 +322,7 @@ Transaction::ResultCode Transaction::patch(PatchCommand command) {
   // Patch each function with jump to hook location.
   for (size_t idx = 0; idx < _descriptors.size(); idx++) {
     const auto &descriptor = _descriptors[idx];
-    const auto targetAddr = reinterpret_cast<char*>(descriptor.addr);
+    const auto targetAddr = reinterpret_cast<char *>(descriptor.addr);
     const uintptr_t hookAddr = _hooks[idx];
 
     if (command == Apply) {
@@ -345,11 +347,29 @@ Transaction::ResultCode Transaction::patch(PatchCommand command) {
 }
 
 Transaction::ResultCode Transaction::commit() {
-  return patch(Apply);
+  if (_state != TxnPrepared) {
+    return ErrorInvalidState;
+  }
+
+  const auto result = patch(Apply);
+  if (result == Success) {
+    _state = TxnCommitted;
+  }
+
+  return result;
 }
 
 Transaction::ResultCode Transaction::rollback() {
-  return patch(Restore);
+  if (_state != TxnCommitted) {
+    return ErrorInvalidState;
+  }
+
+  const auto result = patch(Restore);
+  if (result == Success) {
+    _state = TxnPrepared;
+  }
+
+  return result;
 }
 
 }; // namespace Interject
